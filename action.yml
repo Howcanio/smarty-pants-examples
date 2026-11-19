@@ -1,0 +1,66 @@
+# Smarty Pants prompt: run one prompt on an exact open model as a workflow step, e.g. review a diff.
+#
+#   - uses: actions/checkout@v4
+#     with: { fetch-depth: 0 }
+#   - uses: Howcanio/smarty-pants-examples@v1
+#     with:
+#       api-key: ${{ secrets.SMARTYPANTS_API_KEY }}
+#       input-command: git diff origin/${{ github.base_ref }}...
+#       system: Review this diff in 5 bullets
+name: Smarty Pants prompt
+description: Run a prompt on an exact open model (OpenAI-compatible, priced per token) in a workflow step, e.g. review a diff.
+author: Howcan (Smarty Pants)
+branding:
+  icon: cpu
+  color: green
+inputs:
+  api-key:
+    description: A Smarty Pants API key (keep it in a repository secret). Get one at https://smartypants.network/api
+    required: true
+  prompt:
+    description: The prompt. Leave empty to use input-command's output as the prompt.
+    default: ""
+  input-command:
+    description: A shell command whose output is sent as the prompt (or after it), e.g. git diff.
+    default: ""
+  system:
+    description: Optional system instruction.
+    default: ""
+  model:
+    description: Model id from https://smartypants.network/v1/models (empty = a ready everyday model).
+    default: ""
+  max-tokens:
+    description: Longest answer, in tokens.
+    default: "1024"
+  summary:
+    description: Also write the answer to the job summary.
+    default: "true"
+outputs:
+  answer:
+    description: The model's answer.
+    value: ${{ steps.ask.outputs.answer }}
+runs:
+  using: composite
+  steps:
+    - id: ask
+      shell: bash
+      env:
+        SMARTYPANTS_API_KEY: ${{ inputs.api-key }}
+        IN_PROMPT: ${{ inputs.prompt }}
+        IN_CMD: ${{ inputs.input-command }}
+        IN_SYSTEM: ${{ inputs.system }}
+        IN_MODEL: ${{ inputs.model }}
+        IN_MAX: ${{ inputs.max-tokens }}
+        IN_SUMMARY: ${{ inputs.summary }}
+      run: |
+        set -euo pipefail
+        text="$IN_PROMPT"
+        if [ -n "$IN_CMD" ]; then text="$text"$'\n\n'"$(bash -c "$IN_CMD")"; fi
+        args=(ask - --max-tokens "$IN_MAX")
+        [ -n "$IN_SYSTEM" ] && args+=(--system "$IN_SYSTEM")
+        [ -n "$IN_MODEL" ] && args+=(--model "$IN_MODEL")
+        answer="$(printf '%s' "$text" | npx -y smartypants-network@latest "${args[@]}")"
+        delim="SP_$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
+        { echo "answer<<$delim"; echo "$answer"; echo "$delim"; } >> "$GITHUB_OUTPUT"
+        if [ "$IN_SUMMARY" = "true" ]; then { echo "### Smarty Pants"; echo; echo "$answer"; } >> "$GITHUB_STEP_SUMMARY"; fi
+        echo "$answer"

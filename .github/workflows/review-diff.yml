@@ -1,0 +1,14 @@
+# Example: summarize each pull request's diff with an open model.
+name: Review diff with Smarty Pants
+on: pull_request
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: Howcanio/smarty-pants-examples@v1
+        with:
+          api-key: ${{ secrets.SMARTYPANTS_API_KEY }}
+          input-command: git diff origin/${{ github.base_ref }}...
+          system: Review this diff in 5 bullets. Name any bug you see.

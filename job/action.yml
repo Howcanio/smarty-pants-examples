@@ -1,0 +1,105 @@
+# Smarty Pants job as a GitHub test step (report card goal 58).
+# Runs one whole job in a sealed Linux workspace on an idle Mac: your checked-out code (or a repo URL,
+# or a saved setup), an optional setup command, an optional Claude Code task on Smarty Pants models,
+# your tests, and the files you want back. The step summary shows each step; with upload: true the
+# logs, changes and files are kept as a workflow artifact. The step fails when the job fails.
+# Whole jobs are open to Smarty Pants' own account first; other keys get a clear refusal until they open.
+# Use it from any repository:
+#
+#   - uses: actions/checkout@v4
+#   - uses: Howcanio/smarty-pants-examples/job@v1
+#     with:
+#       api-key: ${{ secrets.SMARTYPANTS_API_KEY }}
+#       setup: npm ci
+#       test: npm test
+name: Smarty Pants job
+description: Run your tests (and optionally a coding task) in a sealed workspace on an idle Mac, billed per second.
+inputs:
+  api-key:
+    description: A Smarty Pants account key (keep it in a repository secret).
+    required: true
+  dir:
+    description: Folder to send (packed without .git and node_modules, 64 MiB at most). Ignored with repo or from.
+    default: "."
+  repo:
+    description: A git URL to clone inside the workspace instead of sending a folder (needs a Mac with internet).
+    default: ""
+  from:
+    description: A saved setup to start from (smartypants setup NAME ...), instead of a folder or repo.
+    default: ""
+  setup:
+    description: Shell command run first, e.g. npm ci.
+    default: ""
+  task:
+    description: Optional task for Claude Code on Smarty Pants models; its changes come back as changes.patch.
+    default: ""
+  test:
+    description: Shell command for the tests, e.g. npm test.
+    default: ""
+  collect:
+    description: Comma separated paths or globs to bring back as files.tar.gz.
+    default: ""
+  model:
+    description: Model for the task.
+    default: ""
+  budget:
+    description: Most the workspace's model key may spend, in USD (0, or 0.10 to 20).
+    default: "0.25"
+  minutes:
+    description: Longest the workspace may stay open.
+    default: "30"
+  retries:
+    description: Times the job may pick up on another Mac from its last finished step if a Mac is lost (0 to 5).
+    default: "1"
+  wait:
+    description: Seconds to wait for a free Mac.
+    default: "300"
+  cli:
+    description: The command-line tool to run, an npm spec (smartypants-network@VERSION) or a path to its bin file.
+    default: smartypants-network@latest
+  upload:
+    description: Keep logs, changes and files as a workflow artifact.
+    default: "true"
+outputs:
+  passed:
+    description: true or false.
+    value: ${{ steps.job.outputs.passed }}
+  failed-step:
+    description: The step that failed, if any.
+    value: ${{ steps.job.outputs.failed_step }}
+  cost-usd:
+    description: What the workspace time cost.
+    value: ${{ steps.job.outputs.cost_usd }}
+  workspace:
+    description: The workspace id.
+    value: ${{ steps.job.outputs.workspace }}
+  out:
+    description: Folder with result.json, step logs, changes.patch and files.tar.gz.
+    value: ${{ steps.job.outputs.out }}
+runs:
+  using: composite
+  steps:
+    - id: job
+      shell: bash
+      env:
+        SMARTYPANTS_API_KEY: ${{ inputs.api-key }}
+        IN_DIR: ${{ inputs.dir }}
+        IN_REPO: ${{ inputs.repo }}
+        IN_FROM: ${{ inputs.from }}
+        IN_SETUP: ${{ inputs.setup }}
+        IN_TASK: ${{ inputs.task }}
+        IN_TEST: ${{ inputs.test }}
+        IN_COLLECT: ${{ inputs.collect }}
+        IN_MODEL: ${{ inputs.model }}
+        IN_BUDGET: ${{ inputs.budget }}
+        IN_MINUTES: ${{ inputs.minutes }}
+        IN_RETRIES: ${{ inputs.retries }}
+        IN_WAIT: ${{ inputs.wait }}
+        IN_CLI: ${{ inputs.cli }}
+      run: node "$GITHUB_ACTION_PATH/run.mjs"
+    - if: always() && inputs.upload == 'true' && steps.job.outputs.out != ''
+      uses: actions/upload-artifact@v4
+      with:
+        name: smartypants-job-${{ github.job }}-${{ github.run_attempt }}
+        path: ${{ steps.job.outputs.out }}
+        if-no-files-found: ignore
