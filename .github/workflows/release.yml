@@ -1,0 +1,28 @@
+# Creates (or moves) a version tag and a GitHub release. Run by hand: Actions > Release > Run workflow.
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Full version, e.g. v1.0.0 (the major tag, e.g. v1, moves to it)
+        required: true
+        default: v1.0.0
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          MAJOR="${VERSION%%.*}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f "$VERSION" && git tag -f "$MAJOR"
+          git push -f origin "refs/tags/$VERSION" "refs/tags/$MAJOR"
+          gh release view "$VERSION" >/dev/null 2>&1 || gh release create "$VERSION" --title "$VERSION" \
+            --notes "Smarty Pants prompt action (uses: Howcanio/smarty-pants-examples@$MAJOR), framework examples and the Claude Code skill."
