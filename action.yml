@@ -62,5 +62,5 @@ runs:
         answer="$(printf '%s' "$text" | npx -y smartypants-network@latest "${args[@]}")"
         delim="SP_$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
         { echo "answer<<$delim"; echo "$answer"; echo "$delim"; } >> "$GITHUB_OUTPUT"
-        if [ "$IN_SUMMARY" = "true" ]; then { echo "### Smarty Pants"; echo; echo "$answer"; } >> "$GITHUB_STEP_SUMMARY"; fi
+        if [ "$IN_SUMMARY" = "true" ]; then { echo "### Smarty Pants"; echo; echo "$answer"; echo; echo "<sub>Answered by an open model on [Smarty Pants](https://smartypants.network/docs/agents)${IN_MODEL:+ (\`$IN_MODEL\`)}.</sub>"; } >> "$GITHUB_STEP_SUMMARY"; fi
         echo "$answer"
